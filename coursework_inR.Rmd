@@ -1,0 +1,97 @@
+---
+title: "ST_coursework_inR_pt1"
+author: "Liu Yitao"
+date: "2025-11-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#1a
+
+```{r}
+log_pdf <- function(x) {
+  return(log(0.5) - abs(x))
+}
+
+true_pdf <- function(x) {
+  return(0.5 * exp(-abs(x)))
+}
+metropolis <- function(N, s, x0) {
+  x <- numeric(N + 1)
+  x[1] <- x0
+  
+  for (i in 2:(N + 1)) {
+    x_prev <- x[i-1]
+    x_star <- rnorm(1, mean = x_prev, sd = s)
+    log_ratio <- log_pdf(x_star) - log_pdf(x_prev)
+    u <- runif(1, min = 0, max = 1)
+    if (log(u) < log_ratio) {
+      x[i] <- x_star 
+    } else {
+      x[i] <- x_prev 
+    }
+  }
+  return(x)
+}
+
+N_a <- 10000
+s_a <- 1
+x0_a <- 0
+
+
+samples_chain <- metropolis(N_a, s_a, x0_a)
+final_samples <- samples_chain[-1] 
+
+#drawing
+hist(final_samples, breaks = 50, freq = FALSE, 
+     col = "pink", border = "white",
+     main = "Metropolis-Hastings Simulation (N=10000, s=1)",
+     xlab = "x", ylim = c(0, 0.6))
+lines(density(final_samples), col = "green", lwd = 2, lty = 2)
+curve(true_pdf(x), from = min(final_samples), to = max(final_samples), 
+      col = "red", lwd = 2, add = TRUE)
+legend("topright", legend = c("Kernel Density", "True f(x)"),
+       col = c("green", "red"), lty = c(2, 1), lwd = 2)
+cat("Sample Mean:", round(mean(final_samples), 4), "\n")
+cat("Sample Standard Deviation:", round(sd(final_samples), 4), "\n")
+
+```
+
+#1b
+
+```{r}
+calculate_r_hat <- function(N, s, J) {
+  chains <- matrix(NA, nrow = N, ncol = J)
+  
+  for (j in 1:J) {
+    start_val <- runif(1, min = -30, max = 30)
+    full_chain <- metropolis(N, s, start_val)
+    chains[, j] <- full_chain[-1]
+  }
+  M_j <- colMeans(chains)
+  V_j <- apply(chains, 2, function(x) mean((x - mean(x))^2))
+  W <- mean(V_j)
+  M <- mean(M_j)
+  B <- mean((M_j - M)^2)
+  if (W == 0) return(NA)
+  R_hat <- sqrt((B + W) / W)
+  return(R_hat)
+}
+
+N_b <- 2000
+J_b <- 4
+s_grid <- seq(0.001, 1, length.out = 100)
+r_hat_values <- numeric(length(s_grid))
+for (i in seq_along(s_grid)) {
+  r_hat_values[i] <- calculate_r_hat(N_b, s_grid[i], J_b)
+}
+plot(s_grid, r_hat_values, type = "l", col = "pink", lwd = 2,
+     main = expression(paste("Sensitivity Analysis: ", hat(R), " with Step Size s")),
+     xlab = "Step Size (s)", ylab = expression(hat(R)),
+     ylim = c(1, max(r_hat_values))) 
+abline(h = 1.05, col = "red", lty = 2, lwd = 2)
+legend("topright", legend = c("R-hat Value", "Threshold 1.05"),
+       col = c("pink", "red"), lty = c(1, 2), lwd = 2)
+```
